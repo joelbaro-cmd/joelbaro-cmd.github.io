@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Estación de temperatura DS18B20</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
+<style>
+  :root{
+    --bg: #0e1512;
+    --panel: #131d19;
+    --panel-border: #24352e;
+    --text: #eaf2ec;
+    --muted: #8ba396;
+    --accent: #ff8a3d;
+    --accent-2: #3ddc97;
+    --cold: #4fa8ff;
+    --hot: #ff5d5d;
+    --mono: 'JetBrains Mono', 'Courier New', monospace;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;}
+  body{padding:0 0 4rem 0;}
+  header{
+    padding:3rem 1.5rem 2rem;
+    max-width:1000px;margin:0 auto;
+  }
+  .kicker{color:var(--accent-2);font-family:var(--mono);font-size:0.8rem;letter-spacing:0.02em;}
+  h1{font-size:2.1rem;line-height:1.15;margin:0.4rem 0 0.6rem;font-weight:650;}
+  .sub{color:var(--muted);max-width:60ch;line-height:1.5;}
+
+  .hero{
+    max-width:1000px;margin:0 auto 2rem;padding:0 1.5rem;
+    display:flex;gap:1rem;flex-wrap:wrap;
+  }
+  .big-reading{
+    flex:1 1 260px;background:var(--panel);border:1px solid var(--panel-border);
+    border-radius:14px;padding:1.6rem 1.8rem;position:relative;overflow:hidden;
+  }
+  .big-reading .value{font-size:3.4rem;font-weight:700;font-family:var(--mono);}
+  .big-reading .unit{font-size:1.6rem;color:var(--muted);font-weight:400;}
+  .big-reading .ts{color:var(--muted);font-size:0.85rem;margin-top:0.4rem;}
+  .status-pill{
+    display:inline-flex;align-items:center;gap:0.4rem;
+    padding:0.3rem 0.7rem;border-radius:999px;font-size:0.8rem;
+    background:rgba(61,220,151,0.12);color:var(--accent-2);margin-top:0.8rem;
+  }
+  .status-pill.off{background:rgba(139,163,150,0.12);color:var(--muted);}
+  .dot{width:7px;height:7px;border-radius:50%;background:currentColor;}
+
+  .side-stats{flex:1 1 220px;display:flex;flex-direction:column;gap:1rem;}
+  .mini-card{
+    background:var(--panel);border:1px solid var(--panel-border);
+    border-radius:14px;padding:1rem 1.2rem;flex:1;
+    display:flex;flex-direction:column;justify-content:center;
+  }
+  .mini-card .label{color:var(--muted);font-size:0.78rem;font-family:var(--mono);}
+  .mini-card .val{font-size:1.5rem;font-weight:650;margin-top:0.15rem;}
+
+  section{max-width:1000px;margin:0 auto;padding:1.2rem 1.5rem;}
+  h2{font-size:1.05rem;font-weight:650;margin:0 0 1rem;
+     display:flex;align-items:baseline;gap:0.5rem;}
+  h2 .tag{color:var(--muted);font-weight:400;font-size:0.8rem;font-family:var(--mono);}
+
+  .panel{
+    background:var(--panel);border:1px solid var(--panel-border);
+    border-radius:14px;padding:1.4rem;margin-bottom:1.4rem;
+  }
+  .chart-wrap{position:relative;height:280px;}
+
+  .franjas-grid{
+    display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));
+    gap:0.9rem;
+  }
+  .franja-card{
+    border:1px solid var(--panel-border);border-radius:12px;padding:1rem;
+    background:linear-gradient(180deg, rgba(255,255,255,0.02), transparent);
+  }
+  .franja-card .nombre{font-family:var(--mono);font-size:0.75rem;color:var(--accent-2);
+    text-transform:capitalize;}
+  .franja-card .media{font-size:1.6rem;font-weight:650;margin:0.25rem 0;}
+  .franja-card .rango{color:var(--muted);font-size:0.8rem;}
+
+  table{width:100%;border-collapse:collapse;font-size:0.88rem;}
+  th,td{text-align:left;padding:0.55rem 0.6rem;border-bottom:1px solid var(--panel-border);}
+  th{color:var(--muted);font-weight:500;font-family:var(--mono);font-size:0.75rem;}
+  td.num{font-family:var(--mono);}
+
+  select{
+    background:var(--panel);color:var(--text);border:1px solid var(--panel-border);
+    border-radius:8px;padding:0.35rem 0.6rem;font-size:0.85rem;
+  }
+
+  footer{max-width:1000px;margin:2rem auto 0;padding:0 1.5rem;color:var(--muted);
+    font-size:0.8rem;line-height:1.6;}
+  footer a{color:var(--accent-2);}
+  .msg-vacio{color:var(--muted);padding:2rem 0;text-align:center;}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="kicker">SENSOR DS18B20 · LECTURA CADA FEW MINUTOS</div>
+  <h1>Temperatura de la instalación, en directo</h1>
+  <p class="sub">Datos del sensor 1-Wire conectado a la Raspberry Pi, con
+  estadísticas diarias, mensuales y por franja horaria. El sistema de
+  climatización se activa automáticamente según la consigna configurada.</p>
+</header>
+
+<div class="hero">
+  <div class="big-reading">
+    <div class="kicker">ÚLTIMA LECTURA</div>
+    <div><span class="value" id="valor-actual">--</span><span class="unit"> °C</span></div>
+    <div class="ts" id="ts-actual">esperando datos…</div>
+    <div class="status-pill off" id="pill-estado"><span class="dot"></span><span id="texto-estado">sin datos de control</span></div>
+  </div>
+  <div class="side-stats">
+    <div class="mini-card">
+      <div class="label">MEDIA DE HOY</div>
+      <div class="val" id="media-hoy">--</div>
+    </div>
+    <div class="mini-card">
+      <div class="label">MÍN / MÁX DE HOY</div>
+      <div class="val" id="minmax-hoy">--</div>
+    </div>
+  </div>
+</div>
+
+<section>
+  <div class="panel">
+    <h2>Últimas lecturas <span class="tag">tiempo real</span></h2>
+    <div class="chart-wrap"><canvas id="chart-reciente"></canvas></div>
+  </div>
+</section>
+
+<section>
+  <h2>Estadísticas por franja horaria <span class="tag">todo el histórico</span></h2>
+  <div class="franjas-grid" id="grid-franjas"></div>
+</section>
+
+<section>
+  <div class="panel">
+    <h2>
+      Evolución diaria
+      <span class="tag">media / mín / máx por día</span>
+    </h2>
+    <div class="chart-wrap"><canvas id="chart-diario"></canvas></div>
+  </div>
+</section>
+
+<section>
+  <div class="panel">
+    <h2>Resumen mensual</h2>
+    <table id="tabla-mensual">
+      <thead>
+        <tr><th>Mes</th><th>Media</th><th>Mínima</th><th>Máxima</th><th>Lecturas</th></tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
+</section>
+
+<footer>
+  Datos generados desde el fichero <code>temperaturas.csv</code> del sensor y
+  publicados automáticamente en <code>temperaturas.json</code>. Este mismo
+  JSON puede consumirse desde la app móvil mediante la URL "raw" del
+  repositorio de GitHub. Última actualización del fichero:
+  <span id="footer-generado">--</span>.
+</footer>
+
+<script>
+const JSON_URL = "./temperaturas.json";
+const COLOR_ACCENT = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim();
+const COLOR_ACCENT2 = getComputedStyle(document.documentElement).getPropertyValue('--accent-2').trim();
+const COLOR_MUTED = getComputedStyle(document.documentElement).getPropertyValue('--muted').trim();
+
+function fmt(n){ return (n === null || n === undefined) ? '--' : n.toFixed(1); }
+
+async function cargarDatos(){
+  try{
+    const res = await fetch(JSON_URL, {cache: "no-store"});
+    if(!res.ok) throw new Error("HTTP " + res.status);
+    const datos = await res.json();
+    pintar(datos);
+  }catch(err){
+    document.querySelector('header').insertAdjacentHTML('beforeend',
+      `<p class="msg-vacio">Todavía no hay datos publicados (${err.message}). ` +
+      `En cuanto el sensor suba su primera lectura, este panel se rellenará solo.</p>`);
+  }
+}
+
+function pintar(datos){
+  document.getElementById('footer-generado').textContent = datos.generado_en || '--';
+
+  if(datos.ultima_lectura){
+    document.getElementById('valor-actual').textContent = fmt(datos.ultima_lectura.temperatura);
+    document.getElementById('ts-actual').textContent = datos.ultima_lectura.timestamp;
+  }
+
+  const hoy = new Date().toISOString().slice(0,10);
+  const statHoy = datos.estadisticas.por_dia[hoy];
+  if(statHoy){
+    document.getElementById('media-hoy').textContent = fmt(statHoy.media) + ' °C';
+    document.getElementById('minmax-hoy').textContent = fmt(statHoy.min) + ' / ' + fmt(statHoy.max) + ' °C';
+  }
+
+  // --- Gráfico de lecturas recientes ---
+  const recientes = datos.lecturas_recientes || [];
+  new Chart(document.getElementById('chart-reciente'), {
+    type: 'line',
+    data: {
+      labels: recientes.map(l => l.timestamp.slice(5,16)),
+      datasets: [{
+        label: 'Temperatura (°C)',
+        data: recientes.map(l => l.temperatura),
+        borderColor: COLOR_ACCENT,
+        backgroundColor: 'transparent',
+        tension: 0.25,
+        pointRadius: 0,
+        borderWidth: 2,
+      }]
+    },
+    options: opcionesComunes()
+  });
+
+  // --- Franjas horarias ---
+  const grid = document.getElementById('grid-franjas');
+  const orden = ['madrugada','mañana','tarde','noche'];
+  orden.forEach(nombre => {
+    const s = datos.estadisticas.por_franja_horaria[nombre];
+    const div = document.createElement('div');
+    div.className = 'franja-card';
+    div.innerHTML = s ?
+      `<div class="nombre">${nombre}</div>
+       <div class="media">${fmt(s.media)}°</div>
+       <div class="rango">${fmt(s.min)}° — ${fmt(s.max)}° · ${s.n} lecturas</div>` :
+      `<div class="nombre">${nombre}</div><div class="rango">sin datos</div>`;
+    grid.appendChild(div);
+  });
+
+  // --- Evolución diaria ---
+  const dias = Object.keys(datos.estadisticas.por_dia).sort();
+  new Chart(document.getElementById('chart-diario'), {
+    type: 'line',
+    data: {
+      labels: dias,
+      datasets: [
+        {label:'Media', data: dias.map(d=>datos.estadisticas.por_dia[d].media),
+         borderColor: COLOR_ACCENT2, borderWidth:2, pointRadius:2, tension:0.2},
+        {label:'Mínima', data: dias.map(d=>datos.estadisticas.por_dia[d].min),
+         borderColor: COLOR_MUTED, borderWidth:1, borderDash:[4,4], pointRadius:0, tension:0.2},
+        {label:'Máxima', data: dias.map(d=>datos.estadisticas.por_dia[d].max),
+         borderColor: '#ff5d5d', borderWidth:1, borderDash:[4,4], pointRadius:0, tension:0.2},
+      ]
+    },
+    options: opcionesComunes(true)
+  });
+
+  // --- Tabla mensual ---
+  const tbody = document.querySelector('#tabla-mensual tbody');
+  Object.entries(datos.estadisticas.por_mes).sort().reverse().forEach(([mes, s]) => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${mes}</td><td class="num">${fmt(s.media)} °C</td>
+      <td class="num">${fmt(s.min)} °C</td><td class="num">${fmt(s.max)} °C</td>
+      <td class="num">${s.n}</td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+function opcionesComunes(leyenda){
+  return {
+    responsive:true, maintainAspectRatio:false,
+    plugins:{ legend: { display: !!leyenda, labels:{color:COLOR_MUTED} } },
+    scales:{
+      x:{ ticks:{color:COLOR_MUTED, maxRotation:0, autoSkip:true}, grid:{color:'rgba(255,255,255,0.05)'} },
+      y:{ ticks:{color:COLOR_MUTED}, grid:{color:'rgba(255,255,255,0.05)'} }
+    }
+  };
+}
+
+cargarDatos();
+</script>
+</body>
+</html>
