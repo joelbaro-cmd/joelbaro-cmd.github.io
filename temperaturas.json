@@ -1,0 +1,58 @@
+{
+  "generado_en": "2026-10-26 13:30:41",
+  "total_lecturas": 3,
+  "ultima_lectura": {
+    "timestamp": "2026-10-26 13:30:41",
+    "temperatura": 23.69
+  },
+  "lecturas_recientes": [
+    {
+      "timestamp": "2026-10-26 13:24:10",
+      "temperatura": 23.75
+    },
+    {
+      "timestamp": "2026-10-26 13:25:39",
+      "temperatura": 23.75
+    },
+    {
+      "timestamp": "2026-10-26 13:30:41",
+      "temperatura": 23.69
+    }
+  ],
+  "estadisticas": {
+    "por_dia": {
+      "2026-10-26": {
+        "media": 23.73,
+        "min": 23.69,
+        "max": 23.75,
+        "n": 3
+      }
+    },
+    "por_mes": {
+      "2026-10": {
+        "media": 23.73,
+        "min": 23.69,
+        "max": 23.75,
+        "n": 3
+      }
+    },
+    "por_franja_horaria": {
+      "tarde": {
+        "media": 23.73,
+        "min": 23.69,
+        "max": 23.75,
+        "n": 3
+      }
+    },
+    "por_dia_y_franja": {
+      "2026-10-26": {
+        "tarde": {
+          "media": 23.73,
+          "min": 23.69,
+          "max": 23.75,
+          "n": 3
+        }
+      }
+    }
+  }
+}
