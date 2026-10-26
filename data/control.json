@@ -1,0 +1,6 @@
+{
+  "activo": true,
+  "modo": "calefaccion",
+  "setpoint": 21.0,
+  "histeresis": 0.5
+}
